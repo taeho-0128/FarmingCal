@@ -65,14 +65,71 @@ function Button({ children, className = "", variant = "primary", ...props }) {
 function FloatingTimer({ open, onClose, initSeconds, label }) {
   const [seconds, setSeconds] = useState(initSeconds || 0);
   const [running, setRunning] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [eh, setEh] = useState(0);
+  const [em, setEm] = useState(0);
+  const [es, setEs] = useState(0);
 
+  const keyBase = (label || "아이템").trim() || "default";
+  const storageKey = `hunt_timer_${keyBase}`;
+
+  // 타이머 열릴 때: 저장값이 있으면 항상 우선 적용, 없으면 계산값으로 초기화
+  useEffect(() => {
+    if (!open) return;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const v = Math.max(0, Number(parsed?.seconds) || 0);
+        setSeconds(v);
+      } else {
+        setSeconds(initSeconds || 0);
+      }
+    } catch {
+      setSeconds(initSeconds || 0);
+    }
+    setRunning(false);
+    setEditing(false);
+  }, [open, initSeconds, storageKey]);
+
+  // 1초마다 감소
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [running]);
 
+  // 변경사항을 항상 로컬 저장소에 자동 저장 (열려 있을 때)
+  useEffect(() => {
+    if (!open) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ seconds, updatedAt: Date.now() }));
+    } catch {}
+  }, [seconds, open, storageKey]);
+
   const time = formatTime(seconds);
+
+  const handleClose = () => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ seconds, updatedAt: Date.now() }));
+    } catch {}
+    onClose?.();
+  };
+
+  const startEdit = () => {
+    const t = formatTime(seconds);
+    setEh(t.h);
+    setEm(t.m);
+    setEs(t.s);
+    setEditing(true);
+  };
+
+  const applyEdit = () => {
+    const total = Math.max(0, (Number(eh) || 0) * 3600 + (Number(em) || 0) * 60 + (Number(es) || 0));
+    setSeconds(total);
+    setEditing(false);
+    setRunning(false);
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -90,34 +147,54 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
                   <Timer className="h-4 w-4 text-neutral-500" />
                   <span className="text-sm font-semibold">타이머 – {label || "아이템"}</span>
                 </div>
-                <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700">
+                <button onClick={handleClose} className="text-neutral-400 hover:text-neutral-700">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="p-4 flex flex-col items-center gap-3">
-                <div className="text-3xl font-bold">{time.label}</div>
+                {!editing ? (
+                  <>
+                    <div className="text-3xl font-bold flex items-center gap-2">
+                      {time.label}
+                      <button onClick={startEdit} className="text-xs rounded-md border px-2 py-1 hover:bg-neutral-50">편집</button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="bg-green-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-green-700"
+                        onClick={() => setRunning(true)}
+                      >
+                        <Play className="h-4 w-4 inline mr-1" /> 시작
+                      </button>
+                      <button
+                        className="bg-yellow-500 text-white rounded-lg px-3 py-2 text-sm hover:bg-yellow-600"
+                        onClick={() => setRunning(false)}
+                      >
+                        <Pause className="h-4 w-4 inline mr-1" /> 정지
+                      </button>
+                      <button
+                        className="bg-rose-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-rose-700"
+                        onClick={() => setSeconds(initSeconds || 0)}
+                      >
+                        <RotateCcw className="h-4 w-4 inline mr-1" /> 초기화
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 text-sm">
+                      <input type="number" min="0" value={eh} onChange={(e) => setEh(e.target.value)} className="w-16 rounded-md border px-2 py-1" />시간
+                      <input type="number" min="0" value={em} onChange={(e) => setEm(e.target.value)} className="w-16 rounded-md border px-2 py-1" />분
+                      <input type="number" min="0" value={es} onChange={(e) => setEs(e.target.value)} className="w-16 rounded-md border px-2 py-1" />초
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="bg-blue-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-blue-700" onClick={applyEdit}>적용</button>
+                      <button className="rounded-lg px-3 py-2 text-sm border" onClick={() => setEditing(false)}>취소</button>
+                    </div>
+                  </>
+                )}
 
-                <div className="flex gap-2">
-                  <button
-                    className="bg-green-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-green-700"
-                    onClick={() => setRunning(true)}
-                  >
-                    <Play className="h-4 w-4 inline mr-1" /> 시작
-                  </button>
-                  <button
-                    className="bg-yellow-500 text-white rounded-lg px-3 py-2 text-sm hover:bg-yellow-600"
-                    onClick={() => setRunning(false)}
-                  >
-                    <Pause className="h-4 w-4 inline mr-1" /> 정지
-                  </button>
-                  <button
-                    className="bg-rose-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-rose-700"
-                    onClick={() => setSeconds(initSeconds || 0)}
-                  >
-                    <RotateCcw className="h-4 w-4 inline mr-1" /> 초기화
-                  </button>
-                </div>
+                <p className="text-[11px] text-neutral-500 mt-1">타이머를 닫아도 남은 시간은 자동 저장됩니다.</p>
               </div>
             </div>
           </motion.div>
@@ -132,37 +209,37 @@ export default function App() {
   const [itemName, setItemName] = useState("");
   const [dropRatePct, setDropRatePct] = useState("");
   const [monsterXp, setMonsterXp] = useState("");
-  const [xp5min, setXp5min] = useState("");
+  const [xp1min, setXp1min] = useState("");
   const [inputMode, setInputMode] = useState("kills");
-  const [kills5min, setKills5min] = useState("");
+  const [kills1min, setKills1min] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
 
   const metrics = useMemo(() => {
     const p = Number(dropRatePct) / 100;
     const mxp = Number(monsterXp);
-    const xp5 = Number(xp5min);
-    const k5 = Number(kills5min);
+    const xp1 = Number(xp1min);
+    const k1 = Number(kills1min);
 
     if (!p) return null;
 
     const expectedKills = Math.round(1 / p);
-    let killsPer5m = 0;
+    let killsPer1m = 0;
 
     if (inputMode === "xp") {
-      if (!mxp || !xp5) return null;
-      killsPer5m = Math.floor(xp5 / mxp);
+      if (!mxp || !xp1) return null;
+      killsPer1m = Math.floor(xp1 / mxp);
     } else {
-      if (!k5) return null;
-      killsPer5m = k5;
+      if (!k1) return null;
+      killsPer1m = k1;
     }
 
-    const killsPerHr = killsPer5m * 12;
+    const killsPerHr = killsPer1m * 60;
     const secondsNeeded = Math.round((expectedKills / (killsPerHr || 1)) * 3600);
     const probAtExpected = successProbability(p, expectedKills);
 
-    return { expectedKills, killsPer5m, killsPerHr, secondsNeeded, probAtExpected };
-  }, [dropRatePct, monsterXp, xp5min, kills5min, inputMode]);
+    return { expectedKills, killsPer1m, killsPerHr, secondsNeeded, probAtExpected };
+  }, [dropRatePct, monsterXp, xp1min, kills1min, inputMode]);
 
   const time = formatTime(metrics?.secondsNeeded || 0);
 
@@ -204,16 +281,16 @@ export default function App() {
                       <Input type="number" placeholder="예: 115" value={monsterXp} onChange={(e) => setMonsterXp(e.target.value)} />
                     </div>
                     <div>
-                      <Label>5분 사냥 경험치</Label>
-                      <Input type="number" placeholder="예: 35000" value={xp5min} onChange={(e) => setXp5min(e.target.value)} />
+                      <Label>1분 사냥 경험치</Label>
+                      <Input type="number" placeholder="예: 7000" value={xp1min} onChange={(e) => setXp1min(e.target.value)} />
                     </div>
                   </>
                 )}
 
                 {inputMode === "kills" && (
                   <div>
-                    <Label>5분 사냥 마리 수</Label>
-                    <Input type="number" placeholder="예: 300" value={kills5min} onChange={(e) => setKills5min(e.target.value)} />
+                    <Label>1분 사냥 마리 수</Label>
+                    <Input type="number" placeholder="예: 60" value={kills1min} onChange={(e) => setKills1min(e.target.value)} />
                   </div>
                 )}
 
@@ -237,8 +314,8 @@ export default function App() {
                       <div className="mt-1 text-xl font-semibold tabular-nums">{metrics.expectedKills.toLocaleString()}</div>
                     </div>
                     <div className="rounded-xl bg-neutral-50 p-3">
-                      <div className="text-xs text-neutral-500">5분 사냥 마리 수</div>
-                      <div className="mt-1 text-xl font-semibold tabular-nums">{metrics.killsPer5m.toLocaleString()}</div>
+                      <div className="text-xs text-neutral-500">1분 사냥 마리 수</div>
+                      <div className="mt-1 text-xl font-semibold tabular-nums">{metrics.killsPer1m.toLocaleString()}</div>
                     </div>
                     <div className="rounded-xl bg-neutral-50 p-3">
                       <div className="text-xs text-neutral-500">1시간 사냥 마리 수</div>
