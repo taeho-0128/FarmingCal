@@ -64,7 +64,8 @@ function Button({ children, className = "", variant = "primary", ...props }) {
 }
 
 function FloatingTimer({ open, onClose, initSeconds, label }) {
-  const [seconds, setSeconds] = useState(initSeconds || 0);
+  const [seconds, setSeconds] = useState(initSeconds || 0); // 남은 시간
+  const [baseSeconds, setBaseSeconds] = useState(initSeconds || 0); // 총 시간(기준)
   const [running, setRunning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [eh, setEh] = useState(0);
@@ -74,6 +75,7 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   const keyBase = (label || "아이템").trim() || "default";
   const storageKey = `hunt_timer_${keyBase}`;
 
+  // 열릴 때 저장값 우선 복원 (없으면 계산값)
   useEffect(() => {
     if (!open) return;
     try {
@@ -81,35 +83,45 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
       if (raw) {
         const parsed = JSON.parse(raw);
         const v = Math.max(0, Number(parsed?.seconds) || 0);
+        const t = Math.max(v, Number(parsed?.total) || (initSeconds || v));
         setSeconds(v);
+        setBaseSeconds(t);
       } else {
-        setSeconds(initSeconds || 0);
+        const init = initSeconds || 0;
+        setSeconds(init);
+        setBaseSeconds(init);
       }
     } catch {
-      setSeconds(initSeconds || 0);
+      const init = initSeconds || 0;
+      setSeconds(init);
+      setBaseSeconds(init);
     }
     setRunning(false);
     setEditing(false);
   }, [open, initSeconds, storageKey]);
 
+  // 1초마다 감소
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [running]);
 
+  // 항상 자동 저장 (열려 있을 때)
   useEffect(() => {
     if (!open) return;
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ seconds, updatedAt: Date.now() }));
+      localStorage.setItem(storageKey, JSON.stringify({ seconds, total: baseSeconds, updatedAt: Date.now() }));
     } catch {}
-  }, [seconds, open, storageKey]);
+  }, [seconds, baseSeconds, open, storageKey]);
 
-  const time = formatTime(seconds);
+  const remain = formatTime(seconds);
+  const elapsedSec = Math.max(0, (baseSeconds || 0) - (seconds || 0));
+  const elapsed = formatTime(elapsedSec);
 
   const handleClose = () => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ seconds, updatedAt: Date.now() }));
+      localStorage.setItem(storageKey, JSON.stringify({ seconds, total: baseSeconds, updatedAt: Date.now() }));
     } catch {}
     onClose?.();
   };
@@ -125,7 +137,15 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   const applyEdit = () => {
     const total = Math.max(0, (Number(eh) || 0) * 3600 + (Number(em) || 0) * 60 + (Number(es) || 0));
     setSeconds(total);
+    setBaseSeconds(total); // 편집하면 기준도 그 값으로 맞춤
     setEditing(false);
+    setRunning(false);
+  };
+
+  const handleReset = () => {
+    const init = initSeconds || 0;
+    setSeconds(init);
+    setBaseSeconds(init);
     setRunning(false);
   };
 
@@ -150,13 +170,21 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
                 </button>
               </div>
 
-              <div className="p-4 flex flex-col items-center gap-3">
+              <div className="p-4 flex flex-col items-center gap-4">
                 {!editing ? (
                   <>
-                    <div className="text-3xl font-bold flex items-center gap-2">
-                      {time.label}
-                      <button onClick={startEdit} className="text-xs rounded-md border px-2 py-1 hover:bg-neutral-50">편집</button>
+                    {/* 시간 표시: 사냥 시간(경과) + 남은 시간(강조) */}
+                    <div className="grid w-full grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
+                        <div className="text-[11px] text-neutral-500">사냥 시간</div>
+                        <div className="text-lg font-semibold tabular-nums">{elapsed.label}</div>
+                      </div>
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center">
+                        <div className="text-[11px] text-blue-600">남은 시간</div>
+                        <div className="text-2xl font-extrabold tabular-nums leading-tight">{remain.label}</div>
+                      </div>
                     </div>
+
                     <div className="flex gap-2">
                       <button
                         className="bg-green-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-green-700"
@@ -172,11 +200,14 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
                       </button>
                       <button
                         className="bg-rose-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-rose-700"
-                        onClick={() => setSeconds(initSeconds || 0)}
+                        onClick={handleReset}
                       >
                         <RotateCcw className="h-4 w-4 inline mr-1" /> 초기화
                       </button>
+                      <button onClick={startEdit} className="rounded-lg px-3 py-2 text-sm border">편집</button>
                     </div>
+
+                    <p className="text-[11px] text-neutral-500 mt-1">타이머를 닫아도 남은 시간은 자동 저장됩니다.</p>
                   </>
                 ) : (
                   <>
@@ -191,8 +222,6 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
                     </div>
                   </>
                 )}
-
-                <p className="text-[11px] text-neutral-500 mt-1">타이머를 닫아도 남은 시간은 자동 저장됩니다.</p>
               </div>
             </div>
           </motion.div>
@@ -209,8 +238,8 @@ export default function App() {
   const [monsterXp, setMonsterXp] = useState("");
   const [xpBefore, setXpBefore] = useState("");
   const [xpAfter1m, setXpAfter1m] = useState("");
-  const [inputMode, setInputMode] = useState("xp"); // 기본값을 경험치로 설정
   const [kills1min, setKills1min] = useState("");
+  const [inputMode, setInputMode] = useState("xp");
   const [submitted, setSubmitted] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
 
@@ -223,7 +252,6 @@ export default function App() {
     const k1 = Number(kills1min);
 
     if (!p) return null;
-
     const expectedKills = Math.round(1 / p);
     let killsPer1m = 0;
 
@@ -251,7 +279,7 @@ export default function App() {
       </header>
 
       <main className="flex-grow w-full flex justify-center px-5 pb-24">
-        <div className="w-full max-w-6xl grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="w-full max-w-4xl grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
             <CardHeader title="정보 입력" icon={<Calculator className="h-4 w-4 text-neutral-500" />} />
             <CardContent>
@@ -260,7 +288,6 @@ export default function App() {
                   <Label>아이템 이름 (선택)</Label>
                   <Input placeholder="예: 투구 민첩 주문서 60%" value={itemName} onChange={(e) => setItemName(e.target.value)} />
                 </div>
-
                 <div>
                   <Label>아이템 드롭률 (%)</Label>
                   <Input type="number" step="0.0001" min="0" placeholder="예: 0.006" value={dropRatePct} onChange={(e) => setDropRatePct(e.target.value)} />
@@ -358,5 +385,4 @@ export default function App() {
       <Analytics />
     </div>
   );
-
 }
