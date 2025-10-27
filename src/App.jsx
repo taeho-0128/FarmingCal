@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Calculator, Clock, X, Pause, Play, RotateCcw, Timer } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 
 function formatTime(totalSeconds) {
   totalSeconds = Math.max(0, Math.round(totalSeconds || 0));
@@ -356,4 +357,5 @@ export default function App() {
       />
     </div>
   );
+<Analytics />
 }
