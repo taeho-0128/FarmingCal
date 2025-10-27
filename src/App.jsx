@@ -73,7 +73,6 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   const keyBase = (label || "아이템").trim() || "default";
   const storageKey = `hunt_timer_${keyBase}`;
 
-  // 타이머 열릴 때: 저장값이 있으면 항상 우선 적용, 없으면 계산값으로 초기화
   useEffect(() => {
     if (!open) return;
     try {
@@ -92,14 +91,12 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
     setEditing(false);
   }, [open, initSeconds, storageKey]);
 
-  // 1초마다 감소
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [running]);
 
-  // 변경사항을 항상 로컬 저장소에 자동 저장 (열려 있을 때)
   useEffect(() => {
     if (!open) return;
     try {
@@ -209,8 +206,9 @@ export default function App() {
   const [itemName, setItemName] = useState("");
   const [dropRatePct, setDropRatePct] = useState("");
   const [monsterXp, setMonsterXp] = useState("");
-  const [xp1min, setXp1min] = useState("");
-  const [inputMode, setInputMode] = useState("kills");
+  const [xpBefore, setXpBefore] = useState("");
+  const [xpAfter1m, setXpAfter1m] = useState("");
+  const [inputMode, setInputMode] = useState("xp"); // 기본값을 경험치로 설정
   const [kills1min, setKills1min] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -218,7 +216,9 @@ export default function App() {
   const metrics = useMemo(() => {
     const p = Number(dropRatePct) / 100;
     const mxp = Number(monsterXp);
-    const xp1 = Number(xp1min);
+    const xpB = Number(xpBefore);
+    const xpA = Number(xpAfter1m);
+    const xp1 = xpA - xpB;
     const k1 = Number(kills1min);
 
     if (!p) return null;
@@ -227,7 +227,7 @@ export default function App() {
     let killsPer1m = 0;
 
     if (inputMode === "xp") {
-      if (!mxp || !xp1) return null;
+      if (!mxp || !(xp1 > 0)) return null;
       killsPer1m = Math.floor(xp1 / mxp);
     } else {
       if (!k1) return null;
@@ -239,7 +239,7 @@ export default function App() {
     const probAtExpected = successProbability(p, expectedKills);
 
     return { expectedKills, killsPer1m, killsPerHr, secondsNeeded, probAtExpected };
-  }, [dropRatePct, monsterXp, xp1min, kills1min, inputMode]);
+  }, [dropRatePct, monsterXp, xpBefore, xpAfter1m, kills1min, inputMode]);
 
   const time = formatTime(metrics?.secondsNeeded || 0);
 
@@ -281,8 +281,12 @@ export default function App() {
                       <Input type="number" placeholder="예: 115" value={monsterXp} onChange={(e) => setMonsterXp(e.target.value)} />
                     </div>
                     <div>
-                      <Label>1분 사냥 경험치</Label>
-                      <Input type="number" placeholder="예: 7000" value={xp1min} onChange={(e) => setXp1min(e.target.value)} />
+                      <Label>사냥 전 경험치</Label>
+                      <Input type="number" placeholder="예: 12345678" value={xpBefore} onChange={(e) => setXpBefore(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>1분 사냥 후 경험치</Label>
+                      <Input type="number" placeholder="예: 12352678" value={xpAfter1m} onChange={(e) => setXpAfter1m(e.target.value)} />
                     </div>
                   </>
                 )}
@@ -335,6 +339,7 @@ export default function App() {
 
                   <p className="text-xs leading-relaxed text-neutral-500">
                     {metrics.expectedKills.toLocaleString()}마리를 잡았을 때 아이템을 얻을 확률은 약 {(metrics.probAtExpected * 100).toFixed(1)}%입니다.
+                    <br />평균적인 기대값이므로 실제 획득 시간은 운에 따라 다를 수 있습니다.
                   </p>
                 </div>
               )}
