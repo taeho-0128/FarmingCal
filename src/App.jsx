@@ -1,9 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Calculator, Clock, X, Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 
+// 시간 포맷터
 function formatTime(totalSeconds) {
   totalSeconds = Math.max(0, Math.round(totalSeconds || 0));
   const h = Math.floor(totalSeconds / 3600);
@@ -64,8 +65,8 @@ function Button({ children, className = "", variant = "primary", ...props }) {
 }
 
 function FloatingTimer({ open, onClose, initSeconds, label }) {
-  const [seconds, setSeconds] = useState(initSeconds || 0); // 남은 시간
-  const [baseSeconds, setBaseSeconds] = useState(initSeconds || 0); // 총 시간(기준)
+  const [seconds, setSeconds] = useState(initSeconds || 0);
+  const [baseSeconds, setBaseSeconds] = useState(initSeconds || 0);
   const [running, setRunning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [eh, setEh] = useState(0);
@@ -75,7 +76,6 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   const keyBase = (label || "아이템").trim() || "default";
   const storageKey = `hunt_timer_${keyBase}`;
 
-  // 열릴 때 저장값 우선 복원 (없으면 계산값)
   useEffect(() => {
     if (!open) return;
     try {
@@ -87,27 +87,23 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
         setSeconds(v);
         setBaseSeconds(t);
       } else {
-        const init = initSeconds || 0;
-        setSeconds(init);
-        setBaseSeconds(init);
+        setSeconds(initSeconds || 0);
+        setBaseSeconds(initSeconds || 0);
       }
     } catch {
-      const init = initSeconds || 0;
-      setSeconds(init);
-      setBaseSeconds(init);
+      setSeconds(initSeconds || 0);
+      setBaseSeconds(initSeconds || 0);
     }
     setRunning(false);
     setEditing(false);
   }, [open, initSeconds, storageKey]);
 
-  // 1초마다 감소
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [running]);
 
-  // 항상 자동 저장 (열려 있을 때)
   useEffect(() => {
     if (!open) return;
     try {
@@ -137,27 +133,21 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   const applyEdit = () => {
     const total = Math.max(0, (Number(eh) || 0) * 3600 + (Number(em) || 0) * 60 + (Number(es) || 0));
     setSeconds(total);
-    setBaseSeconds(total); // 편집하면 기준도 그 값으로 맞춤
+    setBaseSeconds(total);
     setEditing(false);
     setRunning(false);
   };
 
   const handleReset = () => {
-    const init = initSeconds || 0;
-    setSeconds(init);
-    setBaseSeconds(init);
+    setSeconds(initSeconds || 0);
+    setBaseSeconds(initSeconds || 0);
     setRunning(false);
   };
 
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          className="fixed top-2 right-2 z-[99999] w-[min(92vw,560px)] pointer-events-auto"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed top-2 right-2 z-[99999] w-[min(92vw,560px)] pointer-events-auto">
           <motion.div drag dragMomentum={false} className="cursor-grab active:cursor-grabbing select-none mt-4">
             <div className="rounded-2xl border border-black/10 bg-white/95 backdrop-blur-md shadow-2xl">
               <div className="flex justify-between items-center border-b border-black/5 px-4 py-3">
@@ -173,7 +163,6 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
               <div className="p-4 flex flex-col items-center gap-4">
                 {!editing ? (
                   <>
-                    {/* 시간 표시: 사냥 시간(경과) + 남은 시간(강조) */}
                     <div className="grid w-full grid-cols-2 gap-3">
                       <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
                         <div className="text-[11px] text-neutral-500">사냥 시간</div>
@@ -186,22 +175,13 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
                     </div>
 
                     <div className="flex gap-2">
-                      <button
-                        className="bg-green-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-green-700"
-                        onClick={() => setRunning(true)}
-                      >
+                      <button className="bg-green-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-green-700" onClick={() => setRunning(true)}>
                         <Play className="h-4 w-4 inline mr-1" /> 시작
                       </button>
-                      <button
-                        className="bg-yellow-500 text-white rounded-lg px-3 py-2 text-sm hover:bg-yellow-600"
-                        onClick={() => setRunning(false)}
-                      >
+                      <button className="bg-yellow-500 text-white rounded-lg px-3 py-2 text-sm hover:bg-yellow-600" onClick={() => setRunning(false)}>
                         <Pause className="h-4 w-4 inline mr-1" /> 정지
                       </button>
-                      <button
-                        className="bg-rose-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-rose-700"
-                        onClick={handleReset}
-                      >
+                      <button className="bg-rose-600 text-white rounded-lg px-3 py-2 text-sm hover:bg-rose-700" onClick={handleReset}>
                         <RotateCcw className="h-4 w-4 inline mr-1" /> 초기화
                       </button>
                       <button onClick={startEdit} className="rounded-lg px-3 py-2 text-sm border">편집</button>
@@ -231,7 +211,6 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
     document.body
   );
 }
-
 export default function App() {
   const [itemName, setItemName] = useState("");
   const [dropRatePct, setDropRatePct] = useState("");
@@ -243,6 +222,90 @@ export default function App() {
   const [submitted, setSubmitted] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
 
+  // --- GTM dataLayer helper ---
+  const dl = (event, params = {}) => {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event, ...params });
+  };
+
+  // --- Session tracking (page dwell & abandonment) ---
+  const sessionRef = useRef({
+    start: performance.now(),
+    lastField: null,
+    lastValue: null,
+    inputCount: 0,
+  });
+  useEffect(() => {
+  const onHide = () => {
+    const dur = Math.round((performance.now() - sessionRef.current.start) / 1000);
+    dl("page_abandon", {
+      time_on_page_sec: dur,
+      last_field: sessionRef.current.lastField || "",
+      last_value_len: sessionRef.current.lastValue?.length || 0,
+      input_count: sessionRef.current.inputCount || 0,
+    });
+  };
+  const onVis = () => { if (document.hidden) onHide(); };
+
+  document.addEventListener("visibilitychange", onVis);
+  window.addEventListener("beforeunload", onHide);
+
+  return () => {
+    document.removeEventListener("visibilitychange", onVis);
+    window.removeEventListener("beforeunload", onHide);
+  };
+}, []);
+
+
+  // --- Field tracking handlers ---
+  const onFieldFocus = (name) => () => dl("field_focus", { field_name: name });
+  const onFieldBlur = (name, getVal) => () => {
+    const v = (getVal() ?? "").toString();
+    dl("field_blur", { field_name: name, value_len: v.length });
+  };
+  const onFieldChange = (name, setFn) => (e) => {
+    const v = e.target.value;
+    setFn(v);
+    sessionRef.current.lastField = name;
+    sessionRef.current.lastValue = (v ?? "").toString();
+    sessionRef.current.inputCount += 1;
+    dl("field_input", {
+      field_name: name,
+      value_len: (v ?? "").toString().length,
+      is_number: !isNaN(Number(v)),
+    });
+  };
+
+  const onModeChange = (mode) => {
+    setInputMode(mode);
+    dl("mode_change", { input_mode: mode });
+  };
+
+  const onCalcClick = () => {
+    dl("calc_click", {
+      has_item_name: !!itemName,
+      drop_rate_filled: !!dropRatePct,
+      mode: inputMode,
+      filled_fields: [
+        itemName && "itemName",
+        dropRatePct && "dropRatePct",
+        inputMode === "xp" && monsterXp && "monsterXp",
+        inputMode === "xp" && xpBefore && "xpBefore",
+        inputMode === "xp" && xpAfter1m && "xpAfter1m",
+        inputMode === "kills" && kills1min && "kills1min",
+      ]
+        .filter(Boolean)
+        .join(","),
+    });
+    setSubmitted(true);
+  };
+
+  const onOpenTimer = () => {
+    dl("timer_open", { seconds_init: metrics?.secondsNeeded || 0 });
+    setShowTimer(true);
+  };
+
+  // --- Core calculation ---
   const metrics = useMemo(() => {
     const p = Number(dropRatePct) / 100;
     const mxp = Number(monsterXp);
@@ -286,19 +349,34 @@ export default function App() {
               <form className="flex flex-col gap-4">
                 <div>
                   <Label>아이템 이름 (선택)</Label>
-                  <Input placeholder="예: 투구 민첩 주문서 60%" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+                  <Input
+                    placeholder="예: 투구 민첩 주문서 60%"
+                    value={itemName}
+                    onFocus={onFieldFocus("itemName")}
+                    onBlur={onFieldBlur("itemName", () => itemName)}
+                    onChange={onFieldChange("itemName", setItemName)}
+                  />
                 </div>
                 <div>
                   <Label>아이템 드롭률 (%)</Label>
-                  <Input type="number" step="0.0001" min="0" placeholder="예: 0.006" value={dropRatePct} onChange={(e) => setDropRatePct(e.target.value)} />
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    placeholder="예: 0.006"
+                    value={dropRatePct}
+                    onFocus={onFieldFocus("dropRatePct")}
+                    onBlur={onFieldBlur("dropRatePct", () => dropRatePct)}
+                    onChange={onFieldChange("dropRatePct", setDropRatePct)}
+                  />
                 </div>
 
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-1 text-sm">
-                    <input type="radio" checked={inputMode === "xp"} onChange={() => setInputMode("xp")} /> 경험치로 입력
+                    <input type="radio" checked={inputMode === "xp"} onChange={() => onModeChange("xp")} /> 경험치로 입력
                   </label>
                   <label className="flex items-center gap-1 text-sm">
-                    <input type="radio" checked={inputMode === "kills"} onChange={() => setInputMode("kills")} /> 마리 수로 입력
+                    <input type="radio" checked={inputMode === "kills"} onChange={() => onModeChange("kills")} /> 마리 수로 입력
                   </label>
                 </div>
 
@@ -306,15 +384,36 @@ export default function App() {
                   <>
                     <div>
                       <Label>몬스터 경험치</Label>
-                      <Input type="number" placeholder="예: 115" value={monsterXp} onChange={(e) => setMonsterXp(e.target.value)} />
+                      <Input
+                        type="number"
+                        placeholder="예: 115"
+                        value={monsterXp}
+                        onFocus={onFieldFocus("monsterXp")}
+                        onBlur={onFieldBlur("monsterXp", () => monsterXp)}
+                        onChange={onFieldChange("monsterXp", setMonsterXp)}
+                      />
                     </div>
                     <div>
                       <Label>사냥 전 경험치</Label>
-                      <Input type="number" placeholder="예: 12345678" value={xpBefore} onChange={(e) => setXpBefore(e.target.value)} />
+                      <Input
+                        type="number"
+                        placeholder="예: 12345678"
+                        value={xpBefore}
+                        onFocus={onFieldFocus("xpBefore")}
+                        onBlur={onFieldBlur("xpBefore", () => xpBefore)}
+                        onChange={onFieldChange("xpBefore", setXpBefore)}
+                      />
                     </div>
                     <div>
                       <Label>1분 사냥 후 경험치</Label>
-                      <Input type="number" placeholder="예: 12352678" value={xpAfter1m} onChange={(e) => setXpAfter1m(e.target.value)} />
+                      <Input
+                        type="number"
+                        placeholder="예: 12352678"
+                        value={xpAfter1m}
+                        onFocus={onFieldFocus("xpAfter1m")}
+                        onBlur={onFieldBlur("xpAfter1m", () => xpAfter1m)}
+                        onChange={onFieldChange("xpAfter1m", setXpAfter1m)}
+                      />
                     </div>
                   </>
                 )}
@@ -322,11 +421,18 @@ export default function App() {
                 {inputMode === "kills" && (
                   <div>
                     <Label>1분 사냥 마리 수</Label>
-                    <Input type="number" placeholder="예: 60" value={kills1min} onChange={(e) => setKills1min(e.target.value)} />
+                    <Input
+                      type="number"
+                      placeholder="예: 60"
+                      value={kills1min}
+                      onFocus={onFieldFocus("kills1min")}
+                      onBlur={onFieldBlur("kills1min", () => kills1min)}
+                      onChange={onFieldChange("kills1min", setKills1min)}
+                    />
                   </div>
                 )}
 
-                <Button type="button" className="w-full" onClick={() => setSubmitted(true)}>
+                <Button type="button" className="w-full" onClick={onCalcClick}>
                   <Clock className="h-4 w-4" /> 예상 시간 계산
                 </Button>
               </form>
@@ -360,7 +466,7 @@ export default function App() {
                       <div className="text-xs text-neutral-500">예상 소요 시간</div>
                       <div className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">{time.label}</div>
                     </div>
-                    <Button variant="ghost" onClick={() => setShowTimer(true)}>
+                    <Button variant="ghost" onClick={onOpenTimer}>
                       <Timer className="h-4 w-4" /> 타이머 띄우기
                     </Button>
                   </div>
@@ -376,12 +482,7 @@ export default function App() {
         </div>
       </main>
 
-      <FloatingTimer
-        open={showTimer && !!metrics}
-        onClose={() => setShowTimer(false)}
-        initSeconds={metrics?.secondsNeeded || 0}
-        label={itemName || "아이템"}
-      />
+      <FloatingTimer open={showTimer && !!metrics} onClose={() => setShowTimer(false)} initSeconds={metrics?.secondsNeeded || 0} label={itemName || "아이템"} />
       <Analytics />
     </div>
   );
