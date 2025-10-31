@@ -66,25 +66,43 @@ function Button({ children, className = "", variant = "primary", ...props }) {
 
 /** 간단 비프음: 3번 짧게 울림 */
 function playBeep() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const beep = (t = 0) => {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.type = "sine";
-    o.frequency.value = 880; // 음 높이
-    g.gain.setValueAtTime(0.001, ctx.currentTime + t);
-    g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
-    o.start(ctx.currentTime + t);
-    o.stop(ctx.currentTime + t + 0.17);
-  };
-  // 3번 울리기
-  beep(0);
-  beep(0.25);
-  beep(0.50);
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+
+    // 모바일 Safari 등에서 suspend 상태일 때 강제 resume
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+
+    const beep = (startDelay = 0, freq = 880, duration = 0.4) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "square"; // "삐-"가 더 뚜렷하게 들림
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + startDelay);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const startTime = ctx.currentTime + startDelay;
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05); // 볼륨 상승
+      gain.gain.linearRampToValueAtTime(0.001, startTime + duration); // 자연스럽게 감소
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.05);
+    };
+
+    // “삐— 삐— 삐—” : 약 0.4초씩, 0.6초 간격
+    beep(0, 1000, 0.4);
+    beep(0.8, 1000, 0.4);
+    beep(1.6, 1000, 0.4);
+  } catch (err) {
+    console.error("beep error", err);
+  }
 }
+
 
 /** 폼 안에 넣을 1분 타이머 (알림음 + GA4 커스텀 이벤트 전송 포함) */
 function OneMinuteTimer() {
