@@ -64,6 +64,113 @@ function Button({ children, className = "", variant = "primary", ...props }) {
   );
 }
 
+/** 간단 비프음: 3번 짧게 울림 */
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const beep = (t = 0) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.value = 880; // 음 높이
+    g.gain.setValueAtTime(0.001, ctx.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+    o.start(ctx.currentTime + t);
+    o.stop(ctx.currentTime + t + 0.17);
+  };
+  // 3번 울리기
+  beep(0);
+  beep(0.25);
+  beep(0.50);
+}
+
+/** 폼 안에 넣을 1분 타이머 (알림음 + GA4 커스텀 이벤트 전송 포함) */
+function OneMinuteTimer() {
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          // 완료
+          setRunning(false);
+          playBeep();
+          // GA4/태그매니저에 완료 이벤트 전송
+          try {
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ event: "timer_1m_done" });
+          } catch {}
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const start = () => {
+    setTimeLeft(60);
+    setRunning(true);
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: "timer_1m_start" });
+    } catch {}
+  };
+  const pause = () => setRunning(false);
+  const reset = () => {
+    setRunning(false);
+    setTimeLeft(60);
+  };
+
+  const mm = Math.floor(timeLeft / 60);
+  const ss = String(timeLeft % 60).padStart(2, "0");
+
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-600">1분 타이머</span>
+          <span className="text-base font-semibold tabular-nums">{mm}:{ss}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!running ? (
+            <button
+              type="button"
+              onClick={start}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+            >
+              시작
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={pause}
+              className="px-3 py-1.5 rounded-lg bg-yellow-500 text-white text-xs font-semibold hover:bg-yellow-600"
+            >
+              정지
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={reset}
+            className="px-3 py-1.5 rounded-lg border text-xs font-semibold"
+          >
+            초기화
+          </button>
+        </div>
+      </div>
+      <p className="mt-1 text-[11px] text-neutral-500">
+        1분이 끝나면 알림음이 재생됩니다.
+      </p>
+    </div>
+  );
+}
+
+
 function FloatingTimer({ open, onClose, initSeconds, label }) {
   const [seconds, setSeconds] = useState(initSeconds || 0);
   const [baseSeconds, setBaseSeconds] = useState(initSeconds || 0);
@@ -404,6 +511,7 @@ export default function App() {
                         onChange={onFieldChange("xpBefore", setXpBefore)}
                       />
                     </div>
+                    <OneMinuteTimer />
                     <div>
                       <Label>1분 사냥 후 경험치</Label>
                       <Input
