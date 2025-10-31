@@ -69,39 +69,36 @@ function playBeep() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") ctx.resume();
 
-    // 모바일 Safari 등에서 suspend 상태일 때 강제 resume
-    if (ctx.state === "suspended") {
-      ctx.resume();
-    }
-
-    const beep = (startDelay = 0, freq = 880, duration = 0.4) => {
+    const beep = (startDelay = 0, freq = 880, duration = 0.5) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
-      osc.type = "square"; // "삐-"가 더 뚜렷하게 들림
+      osc.type = "sine"; // ✅ 부드러운 알림음 톤
       osc.frequency.setValueAtTime(freq, ctx.currentTime + startDelay);
-
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       const startTime = ctx.currentTime + startDelay;
-      gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05); // 볼륨 상승
-      gain.gain.linearRampToValueAtTime(0.001, startTime + duration); // 자연스럽게 감소
+
+      // 부드럽게 시작하고 잦아드는 볼륨곡선
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
       osc.start(startTime);
-      osc.stop(startTime + duration + 0.05);
+      osc.stop(startTime + duration);
     };
 
-    // “삐— 삐— 삐—” : 약 0.4초씩, 0.6초 간격
-    beep(0, 1000, 0.4);
-    beep(0.8, 1000, 0.4);
-    beep(1.6, 1000, 0.4);
+    // 부드러운 띵~ 세 번 (약 0.5초씩, 0.5초 간격)
+    beep(0, 1000, 0.5);
+    beep(0.7, 1000, 0.5);
+    beep(1.4, 1000, 0.5);
   } catch (err) {
     console.error("beep error", err);
   }
 }
+
 
 
 /** 폼 안에 넣을 1분 타이머 (알림음 + GA4 커스텀 이벤트 전송 포함) */
