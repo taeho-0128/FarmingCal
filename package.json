@@ -2,25 +2,27 @@
   "name": "huntcalc",
   "version": "1.0.0",
   "type": "module",
+
   "scripts": {
     "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "api": "node api/sheets-local.js"
   },
+
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.18.2",
-    "googleapis": "^105.0.0"
+    "googleapis": "^105.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
   },
-"devDependencies": {
-  "tailwindcss": "^3.4.0",
-  "postcss": "^8.4.0",
-  "autoprefixer": "^10.4.0"
-},
+
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.22",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.17",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.0",
     "vite": "^5.1.0"
   }
 }
