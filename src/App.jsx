@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Calculator, X } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
