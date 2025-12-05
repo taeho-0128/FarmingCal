@@ -6,12 +6,24 @@ import { Analytics } from "@vercel/analytics/react";
 import React from "react";
 
 /* ============================================================
-   Google Sheets CSV URL (Huntcal 시트만 사용)
+   v2 이벤트 dataLayer 푸시 헬퍼
+============================================================ */
+function pushEvent(name, params = {}) {
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event: name, ...params });
+  } catch (e) {
+    console.warn("dataLayer error:", e);
+  }
+}
+
+/* ============================================================
+   Google Sheets CSV URL
 ============================================================ */
 const SHEET =
   "https://docs.google.com/spreadsheets/d/1AsEBaw6Pbrk1t3FxpSO2Nzx_6ltORHnPAbAfve8Xzd8/export?format=csv&gid=";
 
-// 여기 gid를 실제 Huntcal 시트 gid로 맞춰줘야 함.
+// 여기 gid는 Huntcal 시트 gid
 const HUNTCAL_CSV = SHEET + "1420156630";
 
 /* ============================================================
@@ -34,11 +46,11 @@ async function loadCSV(url) {
   const r = await fetch(url);
   const text = await r.text();
   const lines = text.trim().split("\n").map((l) => l.split(","));
-  return lines.slice(1); // 헤더 제거
+  return lines.slice(1);
 }
 
 /* ============================================================
-   UI Components (Card 등)
+   Card 컴포넌트
 ============================================================ */
 function Card({ children, className = "" }) {
   return (
@@ -48,32 +60,32 @@ function Card({ children, className = "" }) {
   );
 }
 
+/* ============================================================
+   Monster Select Component
+============================================================ */
 function MonsterSelect({ monsters, value, onSelect, disabled }) {
   const [open, setOpen] = useState(false);
-
-  const selected = monsters.find(m => m.MonsterName === value);
-
+  const selected = monsters.find((m) => m.MonsterName === value);
   const isDisabled = disabled || monsters.length === 0;
 
   return (
     <div className="relative">
-      {/* 버튼 */}
       <button
-  type="button"
-  disabled={isDisabled}
-  onClick={() => {
-    if (!isDisabled) setOpen(!open);
-  }}
-  className={`
-    w-full rounded-xl px-4 py-3 text-left text-sm flex justify-between items-center
-    transition shadow-sm border border-neutral-300
-    ${isDisabled
-      ? "bg-neutral-100 text-neutral-400 cursor-not-allowed border-neutral-200"
-      : "bg-white text-neutral-800 cursor-pointer hover:border-neutral-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    }
-  `}
->
-
+        type="button"
+        disabled={isDisabled}
+        onClick={() => {
+          if (!isDisabled) setOpen(!open);
+        }}
+        className={`
+          w-full rounded-xl px-4 py-3 text-left text-sm flex justify-between items-center
+          transition shadow-sm border border-neutral-300
+          ${
+            isDisabled
+              ? "bg-neutral-100 text-neutral-400 cursor-not-allowed border-neutral-200"
+              : "bg-white text-neutral-800 cursor-pointer hover:border-neutral-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          }
+        `}
+      >
         <span>
           {isDisabled
             ? "아이템을 먼저 선택하세요"
@@ -86,7 +98,6 @@ function MonsterSelect({ monsters, value, onSelect, disabled }) {
         </span>
       </button>
 
-      {/* 리스트 */}
       {open && !isDisabled && (
         <div
           className="absolute left-0 right-0 mt-1 bg-white border rounded-xl shadow-xl 
@@ -117,7 +128,9 @@ function MonsterSelect({ monsters, value, onSelect, disabled }) {
   );
 }
 
-
+/* ============================================================
+   Card Header / Content
+============================================================ */
 function CardHeader({ title, icon }) {
   return (
     <div className="flex items-center gap-2 border-b border-black/5 px-6 py-5">
@@ -126,15 +139,12 @@ function CardHeader({ title, icon }) {
     </div>
   );
 }
-
 function CardContent({ children, className = "" }) {
   return <div className={`px-6 py-6 ${className}`}>{children}</div>;
 }
-
 function Label({ children }) {
   return <label className="text-sm font-medium text-neutral-700">{children}</label>;
 }
-
 function Input(props) {
   return (
     <input
@@ -147,9 +157,8 @@ function Input(props) {
   );
 }
 
-
 /* ============================================================
-   1분 타이머 (항상 표시)
+   OneMinuteTimer (v2 이벤트 추가 적용)
 ============================================================ */
 function playBeep() {
   try {
@@ -174,7 +183,6 @@ function OneMinuteTimer() {
   const [left, setLeft] = useState(60);
   const [running, setRunning] = useState(false);
 
-  // 새로고침/리로드 시 항상 초기 상태로
   useEffect(() => {
     setLeft(60);
     setRunning(false);
@@ -187,6 +195,10 @@ function OneMinuteTimer() {
         if (v <= 1) {
           playBeep();
           setRunning(false);
+
+          /* v2 이벤트: 1분 타이머 완료 */
+          pushEvent("v2_timer_1m_done");
+
           return 0;
         }
         return v - 1;
@@ -206,6 +218,9 @@ function OneMinuteTimer() {
             onClick={() => {
               setLeft(60);
               setRunning(true);
+
+              /* v2 이벤트: 1분 타이머 시작 */
+              pushEvent("v2_timer_1m_start");
             }}
             className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm"
           >
@@ -213,12 +228,18 @@ function OneMinuteTimer() {
           </button>
         ) : (
           <button
-            onClick={() => setRunning(false)}
+            onClick={() => {
+              setRunning(false);
+
+              /* v2 이벤트: 1분 타이머 일시정지 */
+              pushEvent("v2_timer_1m_pause");
+            }}
             className="bg-yellow-500 text-white px-3 py-2 rounded-lg text-sm"
           >
             정지
           </button>
         )}
+
         <button
           onClick={() => {
             setLeft(60);
@@ -232,9 +253,8 @@ function OneMinuteTimer() {
     </div>
   );
 }
-
 /* ============================================================
-   Floating Timer (결과 타이머 보기)
+   Floating Timer (결과 타이머 보기) — v2 이벤트 추가
 ============================================================ */
 function FloatingTimer({ open, onClose, initSeconds, label }) {
   const [seconds, setSeconds] = useState(initSeconds);
@@ -243,7 +263,15 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
   useEffect(() => {
     setSeconds(initSeconds);
     setRunning(true);
-  }, [initSeconds]);
+
+    if (open) {
+      /* v2 이벤트: 결과 타이머 열기 */
+      pushEvent("v2_timer_view_open", {
+        timer_label: label,
+        init_seconds: initSeconds,
+      });
+    }
+  }, [initSeconds, open]);
 
   useEffect(() => {
     if (!running) return;
@@ -252,6 +280,12 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
         if (s <= 1) {
           playBeep();
           setRunning(false);
+
+          /* v2 이벤트: 결과 타이머 종료 */
+          pushEvent("v2_timer_view_done", {
+            timer_label: label,
+          });
+
           return 0;
         }
         return s - 1;
@@ -266,7 +300,17 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
     <div className="fixed bottom-5 right-5 bg-white shadow-xl border rounded-2xl p-4 w-64 z-[9000]">
       <div className="flex justify-between items-center mb-2">
         <div className="font-semibold">{label}</div>
-        <button onClick={onClose}>
+        <button
+          onClick={() => {
+            /* v2 이벤트: 결과 타이머 닫기 */
+            pushEvent("v2_timer_view_close", {
+              timer_label: label,
+              seconds_left: seconds,
+            });
+
+            onClose();
+          }}
+        >
           <X className="w-5 h-5 text-neutral-600" />
         </button>
       </div>
@@ -280,14 +324,20 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
       <div className="flex justify-center gap-2">
         {running ? (
           <button
-            onClick={() => setRunning(false)}
+            onClick={() => {
+              setRunning(false);
+              pushEvent("v2_timer_view_pause", { timer_label: label });
+            }}
             className="px-3 py-1 rounded-lg bg-yellow-500 text-white text-sm"
           >
             일시정지
           </button>
         ) : (
           <button
-            onClick={() => setRunning(true)}
+            onClick={() => {
+              setRunning(true);
+              pushEvent("v2_timer_view_resume", { timer_label: label });
+            }}
             className="px-3 py-1 rounded-lg bg-blue-600 text-white text-sm"
           >
             다시 시작
@@ -295,7 +345,10 @@ function FloatingTimer({ open, onClose, initSeconds, label }) {
         )}
 
         <button
-          onClick={() => setSeconds(initSeconds)}
+          onClick={() => {
+            setSeconds(initSeconds);
+            pushEvent("v2_timer_view_reset", { timer_label: label });
+          }}
           className="px-3 py-1 rounded-lg border text-sm"
         >
           초기화
@@ -325,22 +378,20 @@ function useHuntcal() {
           XP: Number(r[4] || 0),
           DropItemID: r[5],
           DropRate: (() => {
-  const v = (r[6] || "").trim();
-  if (!v) return 0;
+            const v = (r[6] || "").trim();
+            if (!v) return 0;
 
-  // 퍼센트 문자열 처리: "0.0080%" → 0.00008
-  if (v.endsWith("%")) {
-    const num = parseFloat(v.replace("%", ""));
-    return num / 100;
-  }
-
-  return Number(v) || 0;
-})(),
+            if (v.endsWith("%")) {
+              return parseFloat(v.replace("%", "")) / 100;
+            }
+            return Number(v) || 0;
+          })(),
         }))
       );
       setLoaded(true);
-    }
 
+      pushEvent("v2_sheet_loaded");
+    }
     load();
   }, []);
 
@@ -348,7 +399,7 @@ function useHuntcal() {
 }
 
 /* ============================================================
-   Item AutoComplete Component
+   Item AutoComplete Component — v2 필드 포커스 이벤트 추가
 ============================================================ */
 function ItemAuto({ items, value, onChangeText, onSelect }) {
   const [focus, setFocus] = useState(false);
@@ -364,9 +415,18 @@ function ItemAuto({ items, value, onChangeText, onSelect }) {
       <Input
         placeholder="아이템 이름 검색"
         value={value}
-        onChange={(e) => onChangeText(e.target.value)}
-        onFocus={() => setFocus(true)}
+        onFocus={() => {
+          setFocus(true);
+          pushEvent("v2_field_focus", { field_name: "item_search" });
+        }}
         onBlur={() => setTimeout(() => setFocus(false), 150)}
+        onChange={(e) => {
+          onChangeText(e.target.value);
+          pushEvent("v2_field_input", {
+            field_name: "item_search",
+            length: e.target.value.length,
+          });
+        }}
       />
 
       {focus && (
@@ -381,6 +441,7 @@ function ItemAuto({ items, value, onChangeText, onSelect }) {
               className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                pushEvent("v2_item_select", { item: name });
                 onSelect(name);
                 setFocus(false);
               }}
@@ -395,7 +456,7 @@ function ItemAuto({ items, value, onChangeText, onSelect }) {
 }
 
 /* ============================================================
-   Calculation Logic
+   계산 로직
 ============================================================ */
 function computeExpectedTime(rate, killsPerMin) {
   if (!rate || rate <= 0 || !killsPerMin || killsPerMin <= 0) return null;
@@ -410,58 +471,33 @@ function computeExpectedTime(rate, killsPerMin) {
 
   return { expected, killsPerMin, killsPerHr: killsHr, secAvg, sec90 };
 }
-
-// 드롭률(확률) -> 퍼센트 문자열로
-function shortRate(v) {
-  const num = Number(v) * 100; // 확률 -> %
-  if (!num) return "0%";
-
-  // 아주 작은 값은 자릿수를 더 준다
-  let digits;
-  if (num < 0.01) {
-    digits = 6;     // 0.000400% 같이
-  } else if (num < 0.1) {
-    digits = 4;     // 0.0523% 같이
-  } else {
-    digits = 3;     // 0.008% 같이
-  }
-
-  return `${parseFloat(num.toFixed(digits))}%`;
-}
-
 /* ============================================================
-   Main App
+   Main App — v2 이벤트 완전 적용
 ============================================================ */
 export default function App() {
   const { huntcal, loaded } = useHuntcal();
 
-  // 입력 모드
-  const [mode, setMode] = useState("popular"); // popular | manual
-  const [inputMode, setInputMode] = useState("kills"); // 기본값: 1분당 처치 수
+  /* ----------------------- 상태 ----------------------- */
+  const [mode, setMode] = useState("popular");
+  const [inputMode, setInputMode] = useState("kills");
 
-  // 아이템 / 몬스터 상태
   const [itemSearch, setItemSearch] = useState("");
   const [selectedItemName, setSelectedItemName] = useState("");
   const [selectedMonsterName, setSelectedMonsterName] = useState("");
   const [selectedRow, setSelectedRow] = useState(null);
 
-  // 수치 입력
-  const [dropRatePct, setDropRatePct] = useState(""); // % 값 (0.006 등)
+  const [dropRatePct, setDropRatePct] = useState("");
   const [monsterXp, setMonsterXp] = useState("");
   const [xpBefore, setXpBefore] = useState("");
   const [xpAfter, setXpAfter] = useState("");
   const [kills1min, setKills1min] = useState("");
 
-  // 출력 / 타이머 상태
   const [submitted, setSubmitted] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerLabel, setTimerLabel] = useState("아이템");
 
-  /* ------------------------------------------------------------
-     파생 데이터
-  ------------------------------------------------------------ */
-  // 아이템 목록 (중복 제거)
+  /* ----------------------- 항목 목록 ----------------------- */
   const itemOptions = useMemo(() => {
     const set = new Set();
     huntcal.forEach((r) => {
@@ -470,7 +506,6 @@ export default function App() {
     return Array.from(set);
   }, [huntcal]);
 
-  // 선택된 아이템을 드롭하는 몬스터 목록 (중복 제거)
   const monsterOptions = useMemo(() => {
     if (!selectedItemName) return [];
     const map = new Map();
@@ -483,39 +518,50 @@ export default function App() {
   }, [huntcal, selectedItemName]);
 
   /* ------------------------------------------------------------
-     선택 핸들러
+     선택 핸들러 — v2 이벤트 포함
   ------------------------------------------------------------ */
   const handleItemSelect = (name) => {
+    pushEvent("v2_item_select", { item: name });
+
     setSelectedItemName(name);
     setItemSearch(name);
-
     setSelectedMonsterName("");
     setSelectedRow(null);
     setDropRatePct("");
     setMonsterXp("");
     setSubmitted(false);
   };
-  
 
   const handleMonsterSelect = (monsterName) => {
+    pushEvent("v2_monster_select", { monster: monsterName });
+
     setSelectedMonsterName(monsterName);
     const row =
       monsterOptions.find((m) => m.MonsterName === monsterName) || null;
-    setSelectedRow(row || null);
 
+    setSelectedRow(row);
     if (row) {
-      setMonsterXp(String(row.XP || ""));
-      const pct = (row.DropRate || 0) * 100;
-      setDropRatePct(String(pct));
-    }else {
+  setMonsterXp(String(row.XP || ""));
+  const pct = (row.DropRate || 0) * 100;
+  setDropRatePct(String(pct));
+
+  /* ★ 자동 drop rate 설정 이벤트 */
+  pushEvent("v2_drop_rate_set", {
+    drop_rate_source: "auto",
+    drop_rate: pct,
+    item: selectedItemName,
+    monster: monsterName,
+  });
+  }  else {
       setMonsterXp("");
       setDropRatePct("");
     }
     setSubmitted(false);
+    
   };
 
   /* ------------------------------------------------------------
-     계산 로직 준비
+     계산 준비
   ------------------------------------------------------------ */
   const rate = (Number(dropRatePct) || 0) / 100;
   const xp = Number(monsterXp) || 0;
@@ -524,74 +570,81 @@ export default function App() {
   const xpGain = after - before;
   const killsManual = Number(kills1min) || 0;
 
-  // 드롭 몬스터 1마리 경험치
-  const dropXp = xp;
-
-  // 실제 처치 속도 (드롭 몬스터 기준)
   const killsPerMin =
     inputMode === "xp"
-      ? xpGain > 0 && dropXp > 0
-        ? xpGain / dropXp
+      ? xpGain > 0 && xp > 0
+        ? xpGain / xp
         : 0
       : killsManual;
 
   const summaryMetrics = computeExpectedTime(rate, killsPerMin);
 
-  const prob63 =
-    summaryMetrics && rate > 0
-      ? (1 - Math.pow(1 - rate, summaryMetrics.expected)) * 100
-      : null;
-
+  const huntLabel = "드롭 몬스터 기준 사냥 속도";
   const timeAvg = formatTime(summaryMetrics?.secAvg || 0);
   const time90 = formatTime(summaryMetrics?.sec90 || 0);
 
-  const huntLabel = "드롭 몬스터 기준 사냥 속도";
-
+  /* ----------------------- 타이머 열기 ----------------------- */
   const openTimer = (seconds, label) => {
-    if (!seconds || seconds <= 0) return;
-    setTimerSeconds(seconds);
-    setTimerLabel(label || "아이템");
-    setShowTimer(true);
-  };
+  if (!seconds || seconds <= 0) return;
 
-  /* ------------------------------------------------------------
-     렌더링
-  ------------------------------------------------------------ */
+  // 어떤 타이머인지 조건 분기
+  if (label.includes("평균")) {
+    pushEvent("v2_timer_avg_open", {
+      timer_label: label,
+      seconds_init: seconds,
+    });
+  } else if (label.includes("90%")) {
+    pushEvent("v2_timer_90_open", {
+      timer_label: label,
+      seconds_init: seconds,
+    });
+  }
+
+  setTimerSeconds(seconds);
+  setTimerLabel(label || "아이템");
+  setShowTimer(true);
+};
+
+  /* ============================================================
+     렌더링 시작
+  ============================================================ */
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-b from-neutral-50 to-white">
-      {/* 헤더 */}
+      {/* HEADER */}
       <header className="w-full text-center py-10">
         <h1 className="text-5xl font-extrabold tracking-tight">얼마나 잡아야 뜰까?</h1>
       </header>
 
-      {/* 메인 */}
+      {/* MAIN */}
       <main className="flex-grow w-full flex justify-center px-6 pb-28">
         <div className="w-full max-w-[1300px] mx-auto grid grid-cols-1 lg:grid-cols-[520px_1fr] gap-12">
-          {/* ========================= LEFT : 입력 카드 ========================= */}
+
+          {/* LEFT CARD — 입력 */}
           <Card>
             <CardHeader
               title="아이템 선택"
               icon={<Calculator className="h-5 w-5 text-neutral-500" />}
             />
             <CardContent className="space-y-6">
-              {/* 로딩 안내 */}
               {!loaded && (
-                <div className="text-xs text-neutral-400">
-                  구글 시트에서 데이터를 불러오는 중입니다...
-                </div>
+                <div className="text-xs text-neutral-400">구글 시트에서 데이터를 불러오는 중입니다...</div>
               )}
 
-              {/* 인기 아이템 / 직접 입력 탭 */}
+              {/* 탭 */}
               <div className="flex rounded-xl bg-neutral-100 p-1">
                 <button
                   type="button"
                   className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold ${
                     mode === "popular" ? "bg-white shadow-sm" : "text-neutral-500"
                   }`}
-                  onClick={() => setMode("popular")}
+                  onClick={() => {
+                    setMode("popular");
+                    pushEvent("v2_mode_change", { mode: "popular" });
+                  }}
                 >
                   아이템 선택
                 </button>
+
                 <button
                   type="button"
                   className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold ${
@@ -599,6 +652,8 @@ export default function App() {
                   }`}
                   onClick={() => {
                     setMode("manual");
+                    pushEvent("v2_mode_change", { mode: "manual" });
+
                     setSelectedItemName("");
                     setItemSearch("");
                     setSelectedMonsterName("");
@@ -612,10 +667,11 @@ export default function App() {
                 </button>
               </div>
 
-              {/* ------------------------ 인기 아이템 모드 ------------------------ */}
+              {/* ---------------- 인기 아이템 모드 ---------------- */}
               {mode === "popular" && (
                 <div className="space-y-5">
-                  {/* 목표 아이템 */}
+
+                  {/* 아이템 검색 */}
                   <div>
                     <Label>목표 아이템</Label>
                     <ItemAuto
@@ -628,136 +684,154 @@ export default function App() {
                           setSelectedMonsterName("");
                           setSelectedRow(null);
                           setDropRatePct("");
-                          setSubmitted(false);
                         }
                       }}
                       onSelect={handleItemSelect}
                     />
                   </div>
 
-                  {/* 드롭 몬스터 */}
+                  {/* 몬스터 선택 */}
                   <div>
                     <Label>드롭 몬스터</Label>
-                    <div className="relative mt-1">
-                     <MonsterSelect
-  monsters={monsterOptions}
-  value={selectedMonsterName}
-  disabled={!selectedItemName || !monsterOptions.length}
-  onSelect={handleMonsterSelect}
-/>
-                    </div>
+                    <MonsterSelect
+                      monsters={monsterOptions}
+                      value={selectedMonsterName}
+                      disabled={!selectedItemName}
+                      onSelect={handleMonsterSelect}
+                    />
                   </div>
 
-                 {(selectedRow || dropRatePct) && (
-  <div className="rounded-xl bg-neutral-50 border border-neutral-200 p-4 text-xs space-y-1">
-    {selectedRow && (
-      <>
-        <div className="font-semibold text-neutral-900 text-sm">
-          {selectedRow.MonsterName}
-          {selectedRow.Level ? ` (LV ${selectedRow.Level})` : ""}
-        </div>
+                  {/* 선택된 몬스터 정보 */}
+                  {(selectedRow || dropRatePct) && (
+                    <div className="rounded-xl bg-neutral-50 border border-neutral-200 p-4 text-xs space-y-1">
+                      {selectedRow && (
+                        <>
+                          <div className="font-semibold text-neutral-900 text-sm">
+                            {selectedRow.MonsterName}
+                            {selectedRow.Level ? ` (LV ${selectedRow.Level})` : ""}
+                          </div>
 
-        {/* --- 3열 테이블 헤더 --- */}
-        <div className="flex gap-6 mt-2 text-neutral-500">
-          <div className="w-16">HP</div>
-          <div className="w-16">경험치</div>
-          <div className="w-20">드롭률</div>
-        </div>
+                          {/* 테이블 헤더 */}
+                          <div className="flex gap-6 mt-2 text-neutral-500">
+                            <div className="w-16">HP</div>
+                            <div className="w-16">경험치</div>
+                            <div className="w-20">드롭률</div>
+                          </div>
 
-        {/* --- 3열 값 --- */}
-        <div className="flex gap-6 mt-1 font-medium">
-          <div className="w-16">{Number(selectedRow.HP).toLocaleString()}</div>
-          <div className="w-16">{Number(selectedRow.XP).toLocaleString()}</div>
-          <div className="w-20">
-  {dropRatePct ? `${Number(dropRatePct).toFixed(4)}%` : "-"}
-</div>
-
-        </div>
-      </>
-    )}
-  </div>
-)}
-
+                          {/* 테이블 값 */}
+                          <div className="flex gap-6 mt-1 font-medium">
+                            <div className="w-16">{selectedRow.HP.toLocaleString()}</div>
+                            <div className="w-16">{selectedRow.XP.toLocaleString()}</div>
+                            <div className="w-20">
+                              {dropRatePct ? `${Number(dropRatePct).toFixed(4)}%` : "-"}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* ------------------------ 직접 입력 모드 ------------------------ */}
+              {/* ---------------- 직접 입력 모드 ---------------- */}
               {mode === "manual" && (
                 <div className="space-y-5">
                   <div>
-                   <Label>드롭률 (%)</Label>
-<Input
-  type="number"
-  step="0.0001"
-  min="0"
-  placeholder="예: 0.006"
-  value={dropRatePct}
-  onChange={(e) => setDropRatePct(e.target.value)}
-/>
-<p className="mt-1 text-[11px] text-neutral-500">
-  드롭률이 0.006%인 경우 0.006으로 입력하세요.
-</p>
-
+                    <Label>드롭률 (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      placeholder="예: 0.006"
+                      value={dropRatePct}
+                      onChange={(e) => {
+                        setDropRatePct(e.target.value);
+                        pushEvent("v2_field_input", {
+                          field_name: "manual_drop_rate",
+                          length: e.target.value.length,
+                        });
+                      }}
+                    />
+                    <p className="mt-1 text-[11px] text-neutral-500">
+                      드롭률이 0.006%인 경우 0.006으로 입력하세요.
+                    </p>
                   </div>
-                  
                 </div>
               )}
 
-              {/* ===================== 측정 방식 (XP / Kills) ===================== */}
+              {/* ---------------- 측정 방식 선택 ---------------- */}
               <div className="space-y-3 pt-2">
-
                 <Label>측정 방식</Label>
 
                 <div className="flex rounded-xl bg-neutral-100 p-1">
                   <button
-                    type="button"
                     className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold ${
                       inputMode === "kills" ? "bg-white shadow-sm" : "text-neutral-500"
                     }`}
-                    onClick={() => setInputMode("kills")}
+                    onClick={() => {
+                      setInputMode("kills");
+                      pushEvent("v2_mode_change", { input_mode: "kills" });
+                    }}
                   >
                     1분당 처치 수
                   </button>
+
                   <button
-                    type="button"
                     className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold ${
                       inputMode === "xp" ? "bg-white shadow-sm" : "text-neutral-500"
                     }`}
-                    onClick={() => setInputMode("xp")}
+                    onClick={() => {
+                      setInputMode("xp");
+                      pushEvent("v2_mode_change", { input_mode: "xp" });
+                    }}
                   >
                     1분 사냥 경험치
                   </button>
                 </div>
-              </div>
-{/* manual 입력 + XP 방식일 때만 드롭 몬스터 경험치 표시 */}
-{mode === "manual" && inputMode === "xp" && (
-  <div className="pt-2">
-    <Label>드롭 몬스터 경험치</Label>
-    <Input
-      type="number"
-      placeholder="예: 1620"
-      value={monsterXp}
-      onChange={(e) => setMonsterXp(e.target.value)}
-    />
-  </div>
-)}
 
-              {/* 입력 폼 – Kills 모드 */}
+              </div>
+
+              {/* XP 모드에서만 표시 */}
+              {mode === "manual" && inputMode === "xp" && (
+                <div className="pt-2">
+                  <Label>드롭 몬스터 경험치</Label>
+                  <Input
+                    type="number"
+                    placeholder="예: 1620"
+                    value={monsterXp}
+                    onChange={(e) => {
+                      setMonsterXp(e.target.value);
+                      pushEvent("v2_field_input", {
+                        field_name: "monster_xp",
+                        length: e.target.value.length,
+                      });
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* kills 입력 */}
               {inputMode === "kills" && (
                 <div className="pt-1 space-y-3">
                   <div>
-                    <Label>1분당 처치 수 (드롭 몬스터 기준)</Label>
+                    <Label>1분당 처치 수</Label>
                     <Input
                       type="number"
                       placeholder="예: 50"
                       value={kills1min}
-                      onChange={(e) => setKills1min(e.target.value)}
+                      onChange={(e) => {
+                        setKills1min(e.target.value);
+                        pushEvent("v2_field_input", {
+                          field_name: "kills_per_min",
+                          length: e.target.value.length,
+                        });
+                      }}
                     />
                   </div>
                 </div>
               )}
 
-              {/* 입력 폼 – XP 모드 */}
+              {/* XP 입력 */}
               {inputMode === "xp" && (
                 <div className="space-y-4 pt-1">
                   <div>
@@ -766,7 +840,13 @@ export default function App() {
                       type="number"
                       placeholder="예: 1423112"
                       value={xpBefore}
-                      onChange={(e) => setXpBefore(e.target.value)}
+                      onChange={(e) => {
+                        setXpBefore(e.target.value);
+                        pushEvent("v2_field_input", {
+                          field_name: "xp_before",
+                          length: e.target.value.length,
+                        });
+                      }}
                     />
                   </div>
                   <div>
@@ -775,32 +855,45 @@ export default function App() {
                       type="number"
                       placeholder="예: 1430012"
                       value={xpAfter}
-                      onChange={(e) => setXpAfter(e.target.value)}
+                      onChange={(e) => {
+                        setXpAfter(e.target.value);
+                        pushEvent("v2_field_input", {
+                          field_name: "xp_after",
+                          length: e.target.value.length,
+                        });
+                      }}
                     />
                   </div>
                 </div>
               )}
 
-              {/* 항상 보이는 1분 타이머 */}
+              {/* 1분 타이머 항상 표시 */}
               <div className="pt-4 space-y-1">
                 <OneMinuteTimer />
-                <p className="mt-1 text-[11px] text-neutral-500">
-                  1분이 끝나면 알림음이 재생됩니다.
-                </p>
               </div>
 
               {/* 계산 버튼 */}
               <button
                 type="button"
                 className="w-full mt-4 bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700"
-                onClick={() => setSubmitted(true)}
+                onClick={() => {
+                  setSubmitted(true);
+
+                  pushEvent("v2_calc_click", {
+                    item: selectedItemName,
+                    monster: selectedMonsterName,
+                    drop_rate_source: mode === "manual" ? "manual" : "auto",
+                    drop_rate: dropRatePct,
+                    mode: inputMode,
+                  });
+                }}
               >
                 드롭 예상 시간 계산
               </button>
             </CardContent>
           </Card>
 
-          {/* ========================= RIGHT : 결과 카드 ========================= */}
+          {/* RIGHT CARD — 결과 */}
           <Card>
             <CardHeader
               title="계산 결과"
@@ -809,21 +902,18 @@ export default function App() {
             <CardContent className="space-y-5">
               {!submitted && (
                 <p className="text-neutral-500 text-sm">
-                  왼쪽에서 정보를 입력한 뒤{" "}
-                  <strong>드롭 예상 시간 계산</strong> 버튼을 눌러 주세요.
+                  왼쪽에서 정보를 입력한 뒤 <strong>드롭 예상 시간 계산</strong> 버튼을 눌러 주세요.
                 </p>
               )}
 
               {submitted && !summaryMetrics && (
                 <p className="text-rose-500 text-sm">
-                  계산에 필요한 값이 충분하지 않습니다. <br />
-                  드롭률과 사냥 속도(경험치 또는 1분당 처치 수)를 다시 확인해 주세요.
+                  계산에 필요한 값이 충분하지 않습니다.
                 </p>
               )}
 
               {submitted && summaryMetrics && (
                 <>
-                  {/* 상단 요약 */}
                   <div className="space-y-2 text-xs text-neutral-500">
                     <div className="font-semibold text-neutral-800">{huntLabel}</div>
                   </div>
@@ -832,62 +922,67 @@ export default function App() {
                     <div className="rounded-xl bg-neutral-50 p-3">
                       <div className="text-neutral-500">기대 사냥 마리 수</div>
                       <div className="mt-1 text-xl font-bold">
-                        {summaryMetrics.expected.toLocaleString()} 마리
+                        {summaryMetrics.expected.toLocaleString()}
                       </div>
                     </div>
                     <div className="rounded-xl bg-neutral-50 p-3">
                       <div className="text-neutral-500">현재 속도</div>
                       <div className="mt-1 text-xl font-bold">
-                        {summaryMetrics.killsPerMin.toFixed(1)} 마리/1분
+                        {summaryMetrics.killsPerMin.toFixed(1)}
                       </div>
                     </div>
                     <div className="rounded-xl bg-neutral-50 p-3">
                       <div className="text-neutral-500">1시간 사냥 마리 수</div>
                       <div className="mt-1 text-xl font-bold">
-                        {summaryMetrics.killsPerHr.toLocaleString()} 마리
+                        {summaryMetrics.killsPerHr.toLocaleString()}
                       </div>
                     </div>
                   </div>
 
-                  {/* 시간 결과 */}
+                  {/* 시간 계산 결과 */}
                   <div className="pt-4 mt-2 border-t border-neutral-200 space-y-3 text-sm">
+
+                    {/* 평균 시간 */}
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <div>평균적인 기대 시간</div>
-                        <div className="text-[11px] text-neutral-500">
-                          (드롭 확률{" "}
-                          {prob63 != null ? prob63.toFixed(1) : "63.2"}%)
-                        </div>
+                        <div className="text-[11px] text-neutral-500">(드롭 확률 63.2%)</div>
                       </div>
+
                       <div className="flex items-center gap-3">
                         <div className="text-lg font-bold">{timeAvg.label}</div>
+
                         <button
                           type="button"
                           className="text-xs font-semibold text-blue-600"
-                          onClick={() =>
-                            openTimer(summaryMetrics.secAvg, `평균 기대 시간`)
-                          }
+                          onClick={() => {
+                            openTimer(summaryMetrics.secAvg, `평균 기대 시간`);
+                          }}
                         >
                           타이머 보기
                         </button>
                       </div>
                     </div>
 
+                    {/* 90% 도달 시간 */}
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <div>무조건 1개 정도 뜨는 시간</div>
-                        <div className="text-[11px] text-neutral-500">
-                          (드롭 확률 90.0%)
-                        </div>
+                        <div>무조건 1개 뜨는 시간</div>
+                        <div className="text-[11px] text-neutral-500">(드롭 확률 90%)</div>
                       </div>
+
                       <div className="flex items-center gap-3">
                         <div className="text-lg font-bold">{time90.label}</div>
+
                         <button
                           type="button"
                           className="text-xs font-semibold text-blue-600"
-                          onClick={() =>
-                            openTimer(summaryMetrics.sec90, `90% 도달 시간`)
-                          }
+                          onClick={() => {
+                            pushEvent("v2_timer_90_open", {
+                              seconds_init: summaryMetrics.sec90,
+                            });
+                            openTimer(summaryMetrics.sec90, `90% 도달 시간`);
+                          }}
                         >
                           타이머 보기
                         </button>
@@ -901,7 +996,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* 결과용 플로팅 타이머 */}
+      {/* FLOATING TIMER */}
       <FloatingTimer
         open={showTimer}
         onClose={() => setShowTimer(false)}
